@@ -1,0 +1,23 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node/Vite frontend dependencies and build outputs
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Local configuration / Environment keys
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
