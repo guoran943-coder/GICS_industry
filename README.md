@@ -89,3 +89,50 @@ uv run python mcp_client.py get_companies_by_gics gics_code=45
 }
 ```
 配置完成后重启大模型客户端，智能体即可获得主动查询与更新您本地 GICS 行业分类的能力！
+
+---
+
+## ThroatScan HTTP API（Phase 2）
+
+`api_server.py` 现提供 ThroatScan 兼容端点：
+
+| 端点 | 说明 |
+|------|------|
+| `GET /api/health` | 健康检查（PostgreSQL + 静态 SP500 缓存） |
+| `GET /api/companies/{ticker}/classification` | 单 ticker GICS |
+| `POST /api/companies/classifications` | 批量 `{ "tickers": ["NVDA", "AMD"] }` |
+
+静态模式无需数据库，依赖 `data/throatscan-gics-cache.json`（503 条 S&P 500 映射）。
+
+### 本地启动
+
+```bash
+uv sync
+uv run uvicorn api_server:app --host 0.0.0.0 --port 8001
+curl http://127.0.0.1:8001/api/companies/NVDA/classification
+```
+
+### 刷新静态缓存
+
+```bash
+uv run python export_for_throatscan.py
+```
+
+### 部署到 Vercel（推荐，与 ThroatScan 同账号）
+
+```bash
+npx vercel deploy --prod --yes
+```
+
+部署后在 ThroatScan 项目设置：
+
+```bash
+GICS_API_URL=https://<your-gics-api>.vercel.app
+```
+
+### 部署到 Railway / Render（Docker，可接 PostgreSQL）
+
+- **Railway**：连接 GitHub 仓库，使用根目录 `Dockerfile` + `railway.toml`
+- **Render**：Blueprint `render.yaml`，可选配置 `DATABASE_URL`
+
+Fork 仓库：[guoran943-coder/GICS_industry](https://github.com/guoran943-coder/GICS_industry)

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: gics-industry-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GICS_STATIC_MAP_PATH
+        value: /app/data/throatscan-gics-cache.json
+      - key: GICS_SEED_PATH
+        value: /app/gics_seed.json
+      - key: DATABASE_URL
+        sync: false

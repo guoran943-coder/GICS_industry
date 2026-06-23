@@ -2,9 +2,10 @@ import os
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import db
 import workflows.router
+from gics_api_helpers import lookup_ticker_classification, load_static_ticker_map
 
 app = FastAPI(title="GICS Classification API Server")
 
@@ -26,6 +27,66 @@ class CompanyCreate(BaseModel):
 class ReportSave(BaseModel):
     report_md: str
     status: str = "completed"
+
+
+class ClassificationBatchRequest(BaseModel):
+    tickers: List[str] = Field(default_factory=list, max_length=64)
+
+
+@app.get("/api/health")
+def health_check():
+    db_ok = False
+    db_error = None
+    try:
+        with db.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+                cur.fetchone()
+        db_ok = True
+    except Exception as exc:
+        db_error = str(exc)
+
+    static_map = load_static_ticker_map()
+    return {
+        "ok": db_ok or len(static_map) > 0,
+        "service": "gics-industry-api",
+        "database": {"ok": db_ok, "error": db_error},
+        "static_map": {
+            "ok": len(static_map) > 0,
+            "ticker_count": len(static_map),
+        },
+    }
+
+
+@app.get("/api/companies/{ticker}/classification")
+def get_company_classification_json(ticker: str):
+    """ThroatScan-compatible GICS classification JSON for one ticker."""
+    payload = lookup_ticker_classification(ticker)
+    if not payload:
+        raise HTTPException(status_code=404, detail=f"No GICS classification found for {ticker.upper()}")
+    return payload
+
+
+@app.post("/api/companies/classifications")
+def get_company_classifications_batch(body: ClassificationBatchRequest):
+    """Batch GICS lookup for ThroatScan analyze pipeline."""
+    results: dict[str, dict] = {}
+    missing: list[str] = []
+    for raw_ticker in body.tickers:
+        ticker = raw_ticker.upper().strip()
+        if not ticker:
+            continue
+        payload = lookup_ticker_classification(ticker)
+        if payload:
+            results[ticker] = payload
+        else:
+            missing.append(ticker)
+    return {
+        "count": len(results),
+        "missing": missing,
+        "results": results,
+    }
+
 
 @app.get("/api/gics/tree")
 def get_gics_tree():
@@ -287,5 +348,6 @@ def get_company_org(ticker: str):
 
 if __name__ == "__main__":
     import uvicorn
-    # Start on port 8001
-    uvicorn.run("api_server:app", host="127.0.0.1", port=8001, reload=True)
+
+    port = int(os.environ.get("PORT", "8001"))
+    uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=True)
