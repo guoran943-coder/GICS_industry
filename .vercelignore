@@ -4,5 +4,6 @@ __pycache__/
 frontend/node_modules/
 frontend/dist/
 db_backup.sql
+uv.lock
 .git/
 .DS_Store
